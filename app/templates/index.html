@@ -1,10 +1,269 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperTrader Bot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
-$END$
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-gray-800 p-4 flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+            <img src="logo.png" alt="Logo" class="h-10">
+            <h1 class="text-2xl font-bold">SuperTrader</h1>
+        </div>
+        <div>
+            <button class="bg-blue-500 px-4 py-2 rounded-md">로그인</button>
+            <button class="bg-green-500 px-4 py-2 rounded-md ml-2">회원가입</button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow p-4 flex space-x-4">
+        <!-- Left Section: Coin List -->
+        <section class="bg-gray-800 p-4 rounded-md w-1/5">
+            <h2 class="text-xl font-semibold mb-4">코인 목록</h2>
+            <ul class="space-y-2">
+                <li class="flex justify-between p-2 bg-gray-700 rounded-md">BTC/USDT <span>61249.3</span></li>
+                <li class="flex justify-between p-2 bg-gray-700 rounded-md">ETH/USDT <span>2670.05</span></li>
+                <li class="flex justify-between p-2 bg-gray-700 rounded-md">SOL/USDT <span>138.61</span></li>
+                <!-- 코인 목록 추가 -->
+            </ul>
+        </section>
+
+        <!-- Center Section: Chart -->
+        <section class="bg-gray-800 p-4 rounded-md w-3/5">
+            <h2 class="text-xl font-semibold mb-4">시장 차트</h2>
+            <canvas id="marketChart" class="w-full h-96"></canvas>
+        </section>
+
+        <!-- Right Section: Bot Settings -->
+        <section class="bg-gray-800 p-4 rounded-md w-1/5">
+            <h2 class="text-xl font-semibold mb-4">상세 설정</h2>
+            <form id="trading-form" class="space-y-4">
+                <!-- Trading Pair -->
+                <div>
+                    <label for="symbol" class="block text-sm font-medium">거래 코인 페어:</label>
+                    <input type="text" id="symbol" name="symbol" placeholder="예: BTCUSDT" required class="w-full p-2 bg-gray-700 rounded-md">
+                </div>
+
+                <!-- Leverage -->
+                <div>
+                    <label for="leverage" class="block text-sm font-medium">레버리지:</label>
+                    <input type="number" id="leverage" name="leverage" min="1" max="125" required class="w-full p-2 bg-gray-700 rounded-md">
+                </div>
+
+                <!-- Trading Mode -->
+                <div>
+                    <label for="margin_type" class="block text-sm font-medium">거래 모드:</label>
+                    <select id="margin_type" name="margin_type" class="w-full p-2 bg-gray-700 rounded-md">
+                        <option value="CROSS">교차</option>
+                        <option value="ISOLATED">격리</option>
+                    </select>
+                </div>
+
+                <!-- Entry Price Type -->
+                <div>
+                    <label for="entry_price_type" class="block text-sm font-medium">주문 방식:</label>
+                    <select id="entry_price_type" name="entry_price_type" class="w-full p-2 bg-gray-700 rounded-md">
+                        <option value="MARKET">시장가</option>
+                        <option value="LIMIT">지정가</option>
+                    </select>
+                </div>
+
+                <!-- Order Type -->
+                <div>
+                    <label for="order_type" class="block text-sm font-medium">주문 방향:</label>
+                    <select id="order_type" name="order_type" class="w-full p-2 bg-gray-700 rounded-md">
+                        <option value="LONG">롱</option>
+                        <option value="SHORT">숏</option>
+                    </select>
+                </div>
+
+                <!-- Conditions Section -->
+                <h3 class="text-lg font-semibold">거래 조건 (최대 50개)</h3>
+                <div id="conditions" class="space-y-4">
+                    <div class="condition p-4 bg-gray-800 rounded-md">
+                        <div class="space-y-2">
+                            <div>
+                                <label for="entry_price" class="block text-sm font-medium">진입 가격:</label>
+                                <input type="number" class="entry_price w-full p-2 bg-gray-700 rounded-md" placeholder="진입 가격 (지정가만)" step="0.01">
+                            </div>
+
+                            <div>
+                                <label for="collateral" class="block text-sm font-medium">증거금:</label>
+                                <input type="number" class="collateral w-full p-2 bg-gray-700 rounded-md" placeholder="증거금" required>
+                            </div>
+
+                            <div>
+                                <label for="pnl_target" class="block text-sm font-medium">익절률 (%):</label>
+                                <input type="number" class="pnl_target w-full p-2 bg-gray-700 rounded-md" placeholder="익절률" required>
+                            </div>
+
+                            <div>
+                                <label for="gap" class="block text-sm font-medium">회차 간 간격 (%):</label>
+                                <input type="number" class="gap w-full p-2 bg-gray-700 rounded-md" placeholder="회차 간 간격" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buttons for Adding and Removing Conditions -->
+                <div class="flex space-x-4">
+                    <button type="button" id="add-condition" class="w-full bg-green-500 text-white p-2 rounded-md">조건 추가</button>
+                    <button type="button" id="remove-condition" class="w-full bg-red-500 text-white p-2 rounded-md">조건 삭제</button>
+                </div>
+
+                <!-- Repeat Execution Checkbox -->
+                <div>
+                    <label for="repeat_execution" class="block text-sm font-medium">반복 실행:</label>
+                    <input type="checkbox" id="repeat_execution" name="repeat_execution" class="h-4 w-4 text-blue-600">
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md">봇 시작하기</button>
+            </form>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 p-4 text-center">
+        <p>SuperTrader Bot © 2024</p>
+    </footer>
+
+    <!-- Chart.js Example -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const ctx = document.getElementById('marketChart').getContext('2d');
+            const marketChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                    datasets: [{
+                        label: 'BTC/USDT',
+                        data: [30000, 35000, 32000, 37000, 39000, 41000],
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+
+            // WebSocket 연결 설정
+            const websocket = new WebSocket("ws://127.0.0.1:8000/ws");
+
+            websocket.onmessage = function (event) {
+                const data = event.data;
+                console.log("Received from WebSocket:", data);
+                // 실시간 거래 상태 업데이트 처리 (UI 업데이트 가능)
+            };
+
+            // 조건 추가 버튼 기능
+            document.getElementById('add-condition').addEventListener('click', function () {
+                const conditionDiv = document.createElement('div');
+                conditionDiv.className = 'condition p-4 bg-gray-800 rounded-md';
+                conditionDiv.innerHTML = `
+                    <div class="space-y-2">
+                        <div>
+                            <label for="entry_price" class="block text-sm font-medium">진입 가격:</label>
+                            <input type="number" class="entry_price w-full p-2 bg-gray-700 rounded-md" placeholder="진입 가격 (지정가만)" step="0.01">
+                        </div>
+                        <div>
+                            <label for="collateral" class="block text-sm font-medium">증거금:</label>
+                            <input type="number" class="collateral w-full p-2 bg-gray-700 rounded-md" placeholder="증거금" required>
+                        </div>
+                        <div>
+                            <label for="pnl_target" class="block text-sm font-medium">익절률 (%):</label>
+                            <input type="number" class="pnl_target w-full p-2 bg-gray-700 rounded-md" placeholder="익절률" required>
+                        </div>
+                        <div>
+                            <label for="gap" class="block text-sm font-medium">회차 간 간격 (%):</label>
+                            <input type="number" class="gap w-full p-2 bg-gray-700 rounded-md" placeholder="회차 간 간격" required>
+                        </div>
+                    </div>`;
+                const conditionsContainer = document.getElementById('conditions');
+                if (conditionsContainer.children.length < 50) {
+                    conditionsContainer.appendChild(conditionDiv);
+                } else {
+                    alert("최대 50개의 조건만 추가할 수 있습니다.");
+                }
+            });
+
+            // 조건 삭제 버튼 기능
+            document.getElementById('remove-condition').addEventListener('click', function () {
+                const conditionsContainer = document.getElementById('conditions');
+                if (conditionsContainer.children.length > 1) {
+                    conditionsContainer.removeChild(conditionsContainer.lastChild);
+                } else {
+                    alert("최소 한 개의 조건은 필요합니다.");
+                }
+            });
+
+            // 폼 제출 시 거래 시작
+            document.getElementById('trading-form').addEventListener('submit', async function (event) {
+                event.preventDefault();
+
+                const symbol = document.getElementById('symbol').value;
+                const leverage = document.getElementById('leverage').value;
+                const margin_type = document.getElementById('margin_type').value;
+                const entry_price_type = document.getElementById('entry_price_type').value;
+                const order_type = document.getElementById('order_type').value;
+                const repeat_execution = document.getElementById('repeat_execution').checked;
+
+                const conditions = [];
+                let total_gap = 0;
+
+                document.querySelectorAll('.condition').forEach(condition => {
+                    const entry_price = condition.querySelector('.entry_price').value;
+                    const collateral = condition.querySelector('.collateral').value;
+                    const pnl_target = condition.querySelector('.pnl_target').value;
+                    const gap = condition.querySelector('.gap').value;
+
+                    total_gap += parseFloat(gap);
+                    conditions.push({
+                        entry_price: entry_price ? parseFloat(entry_price) : null,
+                        collateral: parseFloat(collateral),
+                        pnl_target: parseFloat(pnl_target),
+                        gap: parseFloat(gap)
+                    });
+                });
+
+                if (order_type === "LONG" && total_gap > 100) {
+                    alert("롱 주문의 경우, 회차 간 간격의 합은 100%를 넘을 수 없습니다.");
+                    return;
+                }
+
+                const payload = {
+                    symbol,
+                    leverage: parseInt(leverage),
+                    margin_type,
+                    entry_price_type,
+                    order_type,
+                    conditions,
+                    repeat_execution
+                };
+
+                const response = await fetch('/trading/start_bot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                alert(result.message);  // 서버로부터 응답 메시지 출력
+            });
+        });
+    </script>
 </body>
 </html>
