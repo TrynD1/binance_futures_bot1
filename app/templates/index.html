@@ -25,11 +25,8 @@
         <!-- Left Section: Coin List -->
         <section class="bg-gray-800 p-4 rounded-md w-1/5">
             <h2 class="text-xl font-semibold mb-4">코인 목록</h2>
-            <ul class="space-y-2">
-                <li class="flex justify-between p-2 bg-gray-700 rounded-md">BTC/USDT <span>61249.3</span></li>
-                <li class="flex justify-between p-2 bg-gray-700 rounded-md">ETH/USDT <span>2670.05</span></li>
-                <li class="flex justify-between p-2 bg-gray-700 rounded-md">SOL/USDT <span>138.61</span></li>
-                <!-- 코인 목록 추가 -->
+            <ul id="coin-list" class="space-y-2">
+                <!-- 코인 목록이 JavaScript로 추가됩니다 -->
             </ul>
         </section>
 
@@ -88,23 +85,18 @@
                     <div class="condition p-4 bg-gray-800 rounded-md">
                         <div class="space-y-2">
                             <div>
-                                <label for="entry_price" class="block text-sm font-medium">진입 가격:</label>
-                                <input type="number" class="entry_price w-full p-2 bg-gray-700 rounded-md" placeholder="진입 가격 (지정가만)" step="0.01">
+                                <label for="gap" class="block text-sm font-medium">추가 진입 간격 (%):</label>
+                                <input type="number" class="gap w-full p-2 bg-gray-700 rounded-md" placeholder="회차 간 간격" required>
                             </div>
 
                             <div>
-                                <label for="collateral" class="block text-sm font-medium">증거금:</label>
+                                <label for="collateral" class="block text-sm font-medium">회차별 증거금:</label>
                                 <input type="number" class="collateral w-full p-2 bg-gray-700 rounded-md" placeholder="증거금" required>
                             </div>
 
                             <div>
-                                <label for="pnl_target" class="block text-sm font-medium">익절률 (%):</label>
+                                <label for="pnl_target" class="block text-sm font-medium">회차별 익절률 (PNL 기준 %):</label>
                                 <input type="number" class="pnl_target w-full p-2 bg-gray-700 rounded-md" placeholder="익절률" required>
-                            </div>
-
-                            <div>
-                                <label for="gap" class="block text-sm font-medium">회차 간 간격 (%):</label>
-                                <input type="number" class="gap w-full p-2 bg-gray-700 rounded-md" placeholder="회차 간 간격" required>
                             </div>
                         </div>
                     </div>
@@ -116,10 +108,15 @@
                     <button type="button" id="remove-condition" class="w-full bg-red-500 text-white p-2 rounded-md">조건 삭제</button>
                 </div>
 
-                <!-- Repeat Execution Checkbox -->
-                <div>
-                    <label for="repeat_execution" class="block text-sm font-medium">반복 실행:</label>
+                <!-- Repeat Execution Section -->
+                <div class="flex items-center space-x-4">
                     <input type="checkbox" id="repeat_execution" name="repeat_execution" class="h-4 w-4 text-blue-600">
+                    <label for="repeat_execution" class="block text-sm font-medium">반복 실행</label>
+                    <select id="execution_type" name="execution_type" class="w-full p-2 bg-gray-700 rounded-md">
+                        <option value="MARKET">시장가</option>
+                        <option value="LIMIT_PERCENTAGE">지정 비율</option>
+                    </select>
+                    <input type="number" id="repeat_percentage" class="w-1/3 p-2 bg-gray-700 rounded-md hidden" placeholder="비율 (%)">
                 </div>
 
                 <!-- Submit Button -->
@@ -133,61 +130,76 @@
         <p>SuperTrader Bot © 2024</p>
     </footer>
 
-    <!-- Chart.js Example -->
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const ctx = document.getElementById('marketChart').getContext('2d');
-            const marketChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [{
-                        label: 'BTC/USDT',
-                        data: [30000, 35000, 32000, 37000, 39000, 41000],
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: false
-                        }
-                    }
+        document.addEventListener('DOMContentLoaded', function() {
+            // Fetch and display the coin list
+            async function fetchCoinList() {
+                const response = await fetch('https://api.binance.com/api/v3/ticker/24hr');
+                const data = await response.json();
+                const usdtPairs = data.filter(coin => coin.symbol.endsWith('USDT'));
+                const coinListElement = document.getElementById('coin-list');
+
+                usdtPairs.forEach(coin => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'flex justify-between p-2 bg-gray-700 rounded-md cursor-pointer';
+                    listItem.innerHTML = `${coin.symbol} <span>${parseFloat(coin.lastPrice).toFixed(2)}</span>`;
+                    listItem.addEventListener('click', () => updateChartAndForm(coin.symbol));
+                    coinListElement.appendChild(listItem);
+                });
+            }
+
+            // Update chart and form when a coin is clicked
+            function updateChartAndForm(symbol) {
+                new TradingView.widget({
+                    "width": "100%",
+                    "height": 400,
+                    "symbol": `BINANCE:${symbol}`,
+                    "interval": "1",
+                    "timezone": "Etc/UTC",
+                    "theme": "dark",
+                    "style": "1",
+                    "locale": "kr",
+                    "toolbar_bg": "#f1f3f6",
+                    "enable_publishing": false,
+                    "hide_side_toolbar": false,
+                    "allow_symbol_change": true,
+                    "container_id": "marketChart"
+                });
+
+                document.getElementById('symbol').value = symbol;
+            }
+
+            fetchCoinList();
+
+            // Show or hide the repeat percentage input
+            document.getElementById('execution_type').addEventListener('change', function() {
+                const executionType = this.value;
+                const repeatPercentageInput = document.getElementById('repeat_percentage');
+                if (executionType === "LIMIT_PERCENTAGE") {
+                    repeatPercentageInput.classList.remove('hidden');
+                } else {
+                    repeatPercentageInput.classList.add('hidden');
+                    repeatPercentageInput.value = ''; // Clear the input if not needed
                 }
             });
 
-            // WebSocket 연결 설정
-            const websocket = new WebSocket("ws://127.0.0.1:8000/ws");
-
-            websocket.onmessage = function (event) {
-                const data = event.data;
-                console.log("Received from WebSocket:", data);
-                // 실시간 거래 상태 업데이트 처리 (UI 업데이트 가능)
-            };
-
-            // 조건 추가 버튼 기능
-            document.getElementById('add-condition').addEventListener('click', function () {
+            // Add and remove conditions
+            document.getElementById('add-condition').addEventListener('click', function() {
                 const conditionDiv = document.createElement('div');
                 conditionDiv.className = 'condition p-4 bg-gray-800 rounded-md';
                 conditionDiv.innerHTML = `
                     <div class="space-y-2">
                         <div>
-                            <label for="entry_price" class="block text-sm font-medium">진입 가격:</label>
-                            <input type="number" class="entry_price w-full p-2 bg-gray-700 rounded-md" placeholder="진입 가격 (지정가만)" step="0.01">
+                            <label for="gap" class="block text-sm font-medium">추가 진입 간격 (%):</label>
+                            <input type="number" class="gap w-full p-2 bg-gray-700 rounded-md" placeholder="회차 간 간격" required>
                         </div>
                         <div>
-                            <label for="collateral" class="block text-sm font-medium">증거금:</label>
+                            <label for="collateral" class="block text-sm font-medium">회차별 증거금:</label>
                             <input type="number" class="collateral w-full p-2 bg-gray-700 rounded-md" placeholder="증거금" required>
                         </div>
                         <div>
-                            <label for="pnl_target" class="block text-sm font-medium">익절률 (%):</label>
+                            <label for="pnl_target" class="block text-sm font-medium">회차별 익절률 (PNL 기준 %):</label>
                             <input type="number" class="pnl_target w-full p-2 bg-gray-700 rounded-md" placeholder="익절률" required>
-                        </div>
-                        <div>
-                            <label for="gap" class="block text-sm font-medium">회차 간 간격 (%):</label>
-                            <input type="number" class="gap w-full p-2 bg-gray-700 rounded-md" placeholder="회차 간 간격" required>
                         </div>
                     </div>`;
                 const conditionsContainer = document.getElementById('conditions');
@@ -198,8 +210,7 @@
                 }
             });
 
-            // 조건 삭제 버튼 기능
-            document.getElementById('remove-condition').addEventListener('click', function () {
+            document.getElementById('remove-condition').addEventListener('click', function() {
                 const conditionsContainer = document.getElementById('conditions');
                 if (conditionsContainer.children.length > 1) {
                     conditionsContainer.removeChild(conditionsContainer.lastChild);
@@ -208,8 +219,8 @@
                 }
             });
 
-            // 폼 제출 시 거래 시작
-            document.getElementById('trading-form').addEventListener('submit', async function (event) {
+            // Handle form submission to start the bot
+            document.getElementById('trading-form').addEventListener('submit', async function(event) {
                 event.preventDefault();
 
                 const symbol = document.getElementById('symbol').value;
@@ -218,22 +229,22 @@
                 const entry_price_type = document.getElementById('entry_price_type').value;
                 const order_type = document.getElementById('order_type').value;
                 const repeat_execution = document.getElementById('repeat_execution').checked;
+                const execution_type = document.getElementById('execution_type').value;
+                const repeat_percentage = document.getElementById('repeat_percentage').value;
 
                 const conditions = [];
                 let total_gap = 0;
 
                 document.querySelectorAll('.condition').forEach(condition => {
-                    const entry_price = condition.querySelector('.entry_price').value;
+                    const gap = condition.querySelector('.gap').value;
                     const collateral = condition.querySelector('.collateral').value;
                     const pnl_target = condition.querySelector('.pnl_target').value;
-                    const gap = condition.querySelector('.gap').value;
 
                     total_gap += parseFloat(gap);
                     conditions.push({
-                        entry_price: entry_price ? parseFloat(entry_price) : null,
+                        gap: parseFloat(gap),
                         collateral: parseFloat(collateral),
-                        pnl_target: parseFloat(pnl_target),
-                        gap: parseFloat(gap)
+                        pnl_target: parseFloat(pnl_target)
                     });
                 });
 
@@ -249,7 +260,9 @@
                     entry_price_type,
                     order_type,
                     conditions,
-                    repeat_execution
+                    repeat_execution,
+                    execution_type,
+                    repeat_percentage: parseFloat(repeat_percentage) || null
                 };
 
                 const response = await fetch('/trading/start_bot', {
